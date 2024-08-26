@@ -16,6 +16,7 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   NaverMapController? mapController;
+  Position? currentLocation;
   double defaultLatitude = 37.5664056;
   double defaultLongitude = 126.9778222;
 
@@ -35,6 +36,9 @@ class _MapScreenState extends State<MapScreen> {
             desiredAccuracy: LocationAccuracy.high);
 
         logger.i("[getCurrentLocation] Current location: $position");
+        setState(() {
+          currentLocation = position;
+        });
         return position;
       } catch (e) {
         Fluttertoast.showToast(msg: "위치 정보를 가져오는데 실패했습니다.");
@@ -45,50 +49,85 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  void moveToCurrentLocation() async {
+  moveToCurrentLocation() async {
     logger.d("[moveToCurrentLocation] invoked.");
     Position? position = await getCurrentLocation();
-    final cameraUpdate = NCameraUpdate.scrollAndZoomTo(
-      target: NLatLng(
-        position?.latitude ?? defaultLatitude,
-        position?.longitude ?? defaultLongitude,
-      ),
-      zoom: 16,
-    );
+    if (position != null) {
+      final cameraUpdate = NCameraUpdate.scrollAndZoomTo(
+        target: NLatLng(
+          position.latitude,
+          position.longitude,
+        ),
+        zoom: 16,
+      );
 
-    cameraUpdate.setAnimation(
-      animation: NCameraAnimation.fly,
-      duration: const Duration(milliseconds: 1000),
-    );
+      cameraUpdate.setAnimation(
+        animation: NCameraAnimation.fly,
+        duration: const Duration(milliseconds: 1000),
+      );
 
-    mapController?.updateCamera(cameraUpdate);
+      mapController?.updateCamera(cameraUpdate);
+    }
+  }
+
+  showLocationOverlay() async {
+    logger.d("[showLocationOverlay] invoked.");
+    var locationOverlay = mapController?.getLocationOverlay();
+    if (locationOverlay != null && currentLocation != null) {
+      locationOverlay.setIsVisible(true);
+      locationOverlay.setPosition(
+        NLatLng(
+          currentLocation!.latitude,
+          currentLocation!.longitude,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
       home: Scaffold(
-        body: NaverMap(
-          options: NaverMapViewOptions(
-            initialCameraPosition: NCameraPosition(
-              target: NLatLng(
-                defaultLatitude,
-                defaultLongitude,
+        body: Stack(
+          children: [
+            NaverMap(
+              options: NaverMapViewOptions(
+                initialCameraPosition: NCameraPosition(
+                  target: NLatLng(
+                    defaultLatitude,
+                    defaultLongitude,
+                  ),
+                  zoom: 16,
+                  bearing: 0,
+                  tilt: 0,
+                ),
               ),
-              zoom: 16,
-              bearing: 0,
-              tilt: 0,
+              onMapReady: (controller) async {
+                mapController = controller;
+                await moveToCurrentLocation();
+                await showLocationOverlay();
+              },
             ),
-          ),
-          onMapReady: (controller) async {
-            mapController = controller;
-            moveToCurrentLocation();
-          },
+            if (currentLocation != null)
+              Positioned(
+                bottom: 50,
+                right: 16,
+                child: Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      moveToCurrentLocation();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(242, 255, 255, 255),
+                      foregroundColor: Colors.blueAccent,
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(10),
+                    ),
+                    child: const Icon(Icons.my_location, size: 24),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );
