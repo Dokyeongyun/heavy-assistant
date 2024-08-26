@@ -1,7 +1,9 @@
-import 'dart:developer';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
+import 'package:heavy_assistant/screen/splash_screen.dart';
+import 'package:logger/logger.dart';
+
+final Logger logger = Logger();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,18 +17,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: Scaffold(
-        body: NaverMap(
-          options: const NaverMapViewOptions(),
-          onMapReady: (controller) {
-            log('Map ready');
-          },
-        ),
+      home: const Scaffold(
+        body: SplashScreen(),
       ),
     );
   }
