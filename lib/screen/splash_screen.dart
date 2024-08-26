@@ -12,6 +12,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  bool isLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -19,7 +21,9 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _initLocationProcess() async {
-    bool permissionGranted = await _requestLocationPermission();
+    await Future.delayed(const Duration(milliseconds: 1000));
+
+    bool permissionGranted = await requestLocationPermission();
     if (!permissionGranted) {
       return;
     }
@@ -31,13 +35,12 @@ class _SplashScreenState extends State<SplashScreen> {
     await prefs.setDouble('latitude', position.latitude);
     await prefs.setDouble('longitude', position.longitude);
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const MapScreen()),
-    );
+    setState(() {
+      isLoading = true;
+    });
   }
 
-  Future<bool> _requestLocationPermission() async {
+  Future<bool> requestLocationPermission() async {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
@@ -53,11 +56,17 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        color: Colors.white,
-        child: Center(
-          child: Image.asset('assets/icon/app_icon.png'),
-        ),
+      body: Stack(
+        children: [
+          const MapScreen(),
+          if (!isLoading)
+            Container(
+              color: Colors.white,
+              child: Center(
+                child: Image.asset('assets/icon/app_icon.png'),
+              ),
+            ),
+        ],
       ),
     );
   }
