@@ -84,65 +84,99 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (currentLatLng == null) {
+      getCurrentLocation().then((value) {
+        setState(() {
+          currentLatLng = value;
+        });
+      });
+
+      return Scaffold(
+        body: Container(
+          color: Colors.white,
+          child: const Center(
+            child: CircularProgressIndicator(
+              color: Colors.amberAccent,
+              backgroundColor: Colors.amber,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
-      body: FutureBuilder<LatLng?>(
-        future: getCurrentLocation(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Container(
-              color: Colors.white,
-              child: Center(
-                child: Image.asset(
-                  'assets/icon/app_icon.png',
+      body: Stack(
+        children: [
+          NaverMap(
+            options: NaverMapViewOptions(
+              initialCameraPosition: NCameraPosition(
+                target: NLatLng(
+                  currentLatLng!.latitude,
+                  currentLatLng!.longitude,
+                ),
+                zoom: 16,
+                bearing: 0,
+                tilt: 0,
+              ),
+            ),
+            onMapReady: (controller) async {
+              mapController = controller;
+              await showLocationOverlay(currentLatLng!);
+            },
+          ),
+          Positioned(
+            bottom: 50,
+            right: 16,
+            child: Center(
+              child: ElevatedButton(
+                onPressed: () {
+                  moveToCurrentLocation();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(242, 255, 255, 255),
+                  foregroundColor: Colors.blueAccent,
+                  shape: const CircleBorder(),
+                  padding: const EdgeInsets.all(10),
+                ),
+                child: const Icon(Icons.my_location, size: 24),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 50,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: IntrinsicWidth(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(100),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text(
+                      '서울 서초구',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            );
-          } else if (snapshot.hasError || !snapshot.hasData) {
-            return const Center(child: Text("위치 정보를 불러오는데 실패했습니다."));
-          } else {
-            LatLng latlng = snapshot.data!;
-            return Stack(
-              children: [
-                NaverMap(
-                  options: NaverMapViewOptions(
-                    initialCameraPosition: NCameraPosition(
-                      target: NLatLng(
-                        latlng.latitude,
-                        latlng.longitude,
-                      ),
-                      zoom: 16,
-                      bearing: 0,
-                      tilt: 0,
-                    ),
-                  ),
-                  onMapReady: (controller) async {
-                    mapController = controller;
-                    await showLocationOverlay(latlng);
-                  },
-                ),
-                Positioned(
-                  bottom: 50,
-                  right: 16,
-                  child: Center(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        moveToCurrentLocation();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            const Color.fromARGB(242, 255, 255, 255),
-                        foregroundColor: Colors.blueAccent,
-                        shape: const CircleBorder(),
-                        padding: const EdgeInsets.all(10),
-                      ),
-                      child: const Icon(Icons.my_location, size: 24),
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }
-        },
+            ),
+          ),
+        ],
       ),
     );
   }
