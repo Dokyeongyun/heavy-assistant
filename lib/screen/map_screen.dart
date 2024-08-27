@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:heavy_assistant/model/latlng.dart';
+import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -18,13 +21,14 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> {
   NaverMapController? mapController;
   LatLng? currentLatLng;
+  String? address;
 
   @override
   void initState() {
     super.initState();
   }
 
-  Future<LatLng?> getCurrentLocation() async {
+  Future<LatLng> getCurrentLocation() async {
     PermissionStatus permissionStatus = await Permission.location.request();
     logger
         .i("[getCurrentLocation] Current permission status: $permissionStatus");
@@ -40,7 +44,7 @@ class _MapScreenState extends State<MapScreen> {
         );
       } catch (e) {
         Fluttertoast.showToast(msg: "위치 정보를 가져오는데 실패했습니다.");
-        return null;
+        return LatLng.defaultLatLng();
       }
     } else {
       return LatLng.defaultLatLng();
@@ -49,23 +53,22 @@ class _MapScreenState extends State<MapScreen> {
 
   moveToCurrentLocation() async {
     logger.d("[moveToCurrentLocation] invoked.");
-    LatLng? latlng = await getCurrentLocation();
-    if (latlng != null) {
-      final cameraUpdate = NCameraUpdate.scrollAndZoomTo(
-        target: NLatLng(
-          latlng.latitude,
-          latlng.longitude,
-        ),
-        zoom: 16,
-      );
+    LatLng latlng = await getCurrentLocation();
+    final cameraUpdate = NCameraUpdate.scrollAndZoomTo(
+      target: NLatLng(
+        latlng.latitude,
+        latlng.longitude,
+      ),
+      zoom: 16,
+    );
 
-      cameraUpdate.setAnimation(
-        animation: NCameraAnimation.fly,
-        duration: const Duration(milliseconds: 1000),
-      );
+    cameraUpdate.setAnimation(
+      animation: NCameraAnimation.fly,
+      duration: const Duration(milliseconds: 1000),
+    );
 
-      mapController?.updateCamera(cameraUpdate);
-    }
+    mapController?.updateCamera(cameraUpdate);
+    setAddress(latlng);
   }
 
   showLocationOverlay(LatLng latlng) async {
@@ -82,12 +85,61 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  setAddress(LatLng latlng) async {
+    logger.d("[setCurrentAddress] invoked.");
+    if (currentLatLng != null) {
+      String? address = await findAddressFromLatLng(latlng);
+      setState(() {
+        this.address = address;
+      });
+    }
+  }
+
+  Future<String?> findAddressFromLatLng(LatLng latlng) async {
+    logger.d(
+        "[findAddressFromLatLng] invoked. latitude: ${latlng.latitude}, longitude: ${latlng.longitude}");
+    String naverApiClientId = '1uoi9f7ytt';
+    String naverApiClientSecret = 'u2o6WssSvWy90JgUA8OeypHeia2GEkWQxelnR5jw';
+    final response = await http.get(
+      Uri.parse(
+          'https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc?coords=${latlng.longitude},${latlng.latitude}&output=json'),
+      headers: {
+        'X-NCP-APIGW-API-KEY-ID': naverApiClientId,
+        'X-NCP-APIGW-API-KEY': naverApiClientSecret,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      final results = data['results'];
+      if (results.isEmpty) {
+        return null;
+      }
+
+      final result = results[0];
+      final area1Name = result['region']['area1']['alias'] ??
+          result['region']['area1']['name'];
+      final area2Name = result['region']['area2']['name'];
+      final area3Name = result['region']['area3']['name'];
+
+      final address = '$area1Name $area2Name $area3Name';
+      logger.d(
+          "[findAddressFromLatLng] latitude: ${latlng.latitude}, longitude: ${latlng.longitude}, address: $address");
+      return address;
+    } else {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (currentLatLng == null) {
-      getCurrentLocation().then((value) {
-        setState(() {
-          currentLatLng = value;
+      getCurrentLocation().then((currentLatLng) {
+        findAddressFromLatLng(currentLatLng).then((address) {
+          setState(() {
+            this.currentLatLng = currentLatLng;
+            this.address = address;
+          });
         });
       });
 
@@ -124,6 +176,20 @@ class _MapScreenState extends State<MapScreen> {
               mapController = controller;
               await showLocationOverlay(currentLatLng!);
             },
+            onCameraChange: (NCameraUpdateReason reason, bool animated) async {
+              if (reason != NCameraUpdateReason.developer) {
+                NCameraPosition? cameraPosition =
+                    await mapController?.getCameraPosition();
+                if (cameraPosition != null) {
+                  setAddress(
+                    LatLng(
+                      latitude: cameraPosition.target.latitude,
+                      longitude: cameraPosition.target.longitude,
+                    ),
+                  );
+                }
+              }
+            },
           ),
           Positioned(
             bottom: 50,
@@ -143,39 +209,40 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           ),
-          Positioned(
-            bottom: 50,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: IntrinsicWidth(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(100),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8,
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text(
-                      '서울 서초구',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black,
+          if (address != null)
+            Positioned(
+              bottom: 55,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: IntrinsicWidth(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(100),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        address!,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black,
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
