@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_naver_map/flutter_naver_map.dart';
-import 'package:heavy_assistant/screen/splash_screen.dart';
+import 'package:heavy_assistant/screen/map_screen.dart';
 import 'package:logger/logger.dart';
 
 final Logger logger = Logger();
@@ -18,7 +18,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       home: Scaffold(
-        body: SplashScreen(),
+        backgroundColor: Colors.white,
+        body: MapScreen(),
       ),
     );
   }
