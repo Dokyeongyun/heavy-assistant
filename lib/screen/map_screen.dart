@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -22,10 +23,17 @@ class _MapScreenState extends State<MapScreen> {
   NaverMapController? mapController;
   LatLng? currentLatLng;
   String? address;
+  Timer? debounceTimer;
 
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    debounceTimer?.cancel();
+    super.dispose();
   }
 
   Future<LatLng> getCurrentLocation() async {
@@ -178,16 +186,20 @@ class _MapScreenState extends State<MapScreen> {
             },
             onCameraChange: (NCameraUpdateReason reason, bool animated) async {
               if (reason != NCameraUpdateReason.developer) {
-                NCameraPosition? cameraPosition =
-                    await mapController?.getCameraPosition();
-                if (cameraPosition != null) {
-                  setAddress(
-                    LatLng(
-                      latitude: cameraPosition.target.latitude,
-                      longitude: cameraPosition.target.longitude,
-                    ),
-                  );
-                }
+                debounceTimer?.cancel();
+                debounceTimer =
+                    Timer(const Duration(milliseconds: 500), () async {
+                  NCameraPosition? cameraPosition =
+                      await mapController?.getCameraPosition();
+                  if (cameraPosition != null) {
+                    setAddress(
+                      LatLng(
+                        latitude: cameraPosition.target.latitude,
+                        longitude: cameraPosition.target.longitude,
+                      ),
+                    );
+                  }
+                });
               }
             },
           ),
