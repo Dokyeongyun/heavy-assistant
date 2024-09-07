@@ -10,6 +10,8 @@ import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../model/heavy_equipment_company.dart';
+
 final Logger logger = Logger();
 
 class MapScreen extends StatefulWidget {
@@ -24,6 +26,7 @@ class _MapScreenState extends State<MapScreen> {
   LatLng? currentLatLng;
   String? address;
   Timer? debounceTimer;
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -139,6 +142,111 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  Future<List<HeavyEquipmentCompany>> fetchHeavyEquipmentCompanies() async {
+    logger.d("[fetchHeavyEquipmentCompanies] invoked.");
+    final url = Uri.parse(
+        'https://api.notion.com/v1/databases/40a9cb777f004f749c44001ab2c556f5/query');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Notion-Version': '2022-06-28',
+          'Authorization':
+              'Bearer secret_ALQSzjbP3tt6kvYQlVT6VIxUxpWUbz62DabTf0b91CX',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> jsonData = json.decode(response.body);
+        List<dynamic> results = jsonData['results'];
+
+        logger.d(
+            "[fetchHeavyEquipmentCompanies] Loaded heavy equipment companies: ${results.length}");
+
+        return results.map(
+          (item) {
+            final properties = item['properties'];
+
+            String? phone;
+            if (properties['phone'] != null &&
+                properties['phone']['rich_text'] != null &&
+                properties['phone']['rich_text'].isNotEmpty) {
+              phone = properties['phone']['rich_text'][0]['plain_text'];
+            } else {
+              phone = null;
+            }
+
+            return HeavyEquipmentCompany(
+              identifier: properties['identifier']['rich_text'][0]
+                  ['plain_text'],
+              companyName: properties['company_name']['title'][0]['plain_text'],
+              address: properties['address']['rich_text'][0]['plain_text'],
+              roadAddress: properties['road_address']['rich_text'][0]
+                  ['plain_text'],
+              location: LatLng(
+                latitude: properties['latitude']['number'],
+                longitude: properties['longitude']['number'],
+              ),
+              phone: phone,
+              url: properties['url']['rich_text'][0]['plain_text'],
+            );
+          },
+        ).toList();
+      } else {
+        throw Exception(
+            '[fetchHeavyEquipmentCompanies] Failed to load heavy equipment companies. statusCode: ${response.statusCode}');
+      }
+    } catch (e) {
+      logger.e(
+          "[fetchHeavyEquipmentCompanies] Failed to load heavy equipment companies: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> addHeavyEquipmentCompanyOverlay(
+    HeavyEquipmentCompany heavyEquipmentCompany,
+  ) async {
+    LatLng location = heavyEquipmentCompany.location;
+    final marker = NMarker(
+      id: heavyEquipmentCompany.identifier,
+      position: NLatLng(
+        location.latitude,
+        location.longitude,
+      ),
+      size: const NSize(40, 40),
+      icon: const NOverlayImage.fromAssetImage('assets/images/excavator.png'),
+      caption: NOverlayCaption(
+        text: heavyEquipmentCompany.companyName,
+        color: Colors.black,
+      ),
+    );
+
+    mapController?.addOverlay(marker);
+    marker.setOnTapListener((NMarker marker) {
+      logger.d("[onTap] Marker tapped: ${marker.info.id}");
+    });
+  }
+
+  Future<void> loadAndDisplayHeavyEquipmentCompanies() async {
+    try {
+      List<HeavyEquipmentCompany> companies =
+          await fetchHeavyEquipmentCompanies();
+
+      for (var company in companies) {
+        await addHeavyEquipmentCompanyOverlay(company);
+      }
+    } catch (e) {
+      logger.e(
+          "[loadAndDisplayHeavyEquipmentCompanies] Error loading heavy equipment companies: $e");
+      Fluttertoast.showToast(msg: "업체 정보를 불러오는데 실패했습니다.");
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (currentLatLng == null) {
@@ -154,11 +262,14 @@ class _MapScreenState extends State<MapScreen> {
       return Scaffold(
         body: Container(
           color: Colors.white,
-          child: const Center(
-            child: CircularProgressIndicator(
-              color: Colors.amberAccent,
-              backgroundColor: Colors.amber,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow),
+          child: Container(
+            color: Colors.black.withOpacity(0.5),
+            child: const Center(
+              child: CircularProgressIndicator(
+                color: Colors.amberAccent,
+                backgroundColor: Colors.amber,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow),
+              ),
             ),
           ),
         ),
@@ -175,7 +286,7 @@ class _MapScreenState extends State<MapScreen> {
                   currentLatLng!.latitude,
                   currentLatLng!.longitude,
                 ),
-                zoom: 16,
+                zoom: 14,
                 bearing: 0,
                 tilt: 0,
               ),
@@ -183,6 +294,7 @@ class _MapScreenState extends State<MapScreen> {
             onMapReady: (controller) async {
               mapController = controller;
               await showLocationOverlay(currentLatLng!);
+              await loadAndDisplayHeavyEquipmentCompanies();
             },
             onCameraChange: (NCameraUpdateReason reason, bool animated) async {
               if (reason != NCameraUpdateReason.developer) {
@@ -203,6 +315,19 @@ class _MapScreenState extends State<MapScreen> {
               }
             },
           ),
+          if (isLoading)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black.withOpacity(0.5),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.amberAccent,
+                    backgroundColor: Colors.amber,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.yellow),
+                  ),
+                ),
+              ),
+            ),
           Positioned(
             bottom: 50,
             right: 16,
