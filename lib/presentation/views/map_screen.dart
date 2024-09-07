@@ -71,7 +71,7 @@ class _MapScreenState extends State<MapScreen> {
           location.latitude,
           location.longitude,
         ),
-        size: const NSize(36, 36),
+        size: const NSize(24, 24),
         icon: const NOverlayImage.fromAssetImage('assets/images/excavator.png'),
         caption: NOverlayCaption(
           text: company.companyName,
