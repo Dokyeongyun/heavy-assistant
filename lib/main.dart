@@ -43,15 +43,100 @@ void main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  int _selectedIndex = 0;
+
+  static final List<Widget> _pages = <Widget>[
+    const MapScreen(),
+    const Text(
+      '기사찾기',
+      style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold),
+    ),
+    const Text(
+      '장비찾기',
+      style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold),
+    ),
+    const MapScreen(),
+    const Text(
+      '나의정보',
+      style: TextStyle(fontSize: 35, fontWeight: FontWeight.bold),
+    ),
+  ];
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       home: Scaffold(
         backgroundColor: Colors.white,
-        body: MapScreen(),
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: _pages,
+        ),
+        bottomNavigationBar: Theme(
+          data: ThemeData(
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+          ),
+          child: BottomNavigationBar(
+            items: const <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home),
+                activeIcon: Icon(Icons.home_filled),
+                label: '홈',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_search_outlined),
+                activeIcon: Icon(Icons.person_search),
+                label: '기사찾기',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.manage_search_outlined),
+                activeIcon: Icon(Icons.manage_search),
+                label: '장비찾기',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.location_on_outlined),
+                activeIcon: Icon(Icons.location_on),
+                label: '중기지도',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_2_outlined),
+                activeIcon: Icon(Icons.person_2),
+                label: '나의정보',
+              ),
+            ],
+            currentIndex: _selectedIndex,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Colors.white,
+            iconSize: 22.0,
+            selectedItemColor: const Color(0xbe131313),
+            unselectedItemColor: Colors.grey,
+            selectedFontSize: 11.0,
+            unselectedFontSize: 11.0,
+            selectedLabelStyle: const TextStyle(
+              fontFamily: 'NotoSansKR',
+              fontWeight: FontWeight.bold,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontFamily: 'NotoSansKR',
+              fontWeight: FontWeight.normal,
+            ),
+            onTap: _onItemTapped,
+          ),
+        ),
       ),
     );
   }
